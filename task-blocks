@@ -1,0 +1,23 @@
+#!/bin/bash
+set -eu
+
+if [[ $(basename "$0") = on-modify.* ]]; then
+	read -r OLD
+fi
+read -r NEW
+
+if [[ "$NEW" = *'"blocks"'* ]] && jq -e '.blocks' <<< "$NEW" > /dev/null; then
+	JQ=$(jq -Mcre '.blocks, .uuid, del(.blocks)' <<< "$NEW")
+	{
+		read -r BLOCKS
+		read -r UUID
+		read -r MODIFIED
+		task rc.confirmation=no rc.bulk=10000 rc.verbose=nothing "$BLOCKS" modify depends:"$UUID" >&2 || {
+			echo "Task $BLOCKS could not be blocked"
+			exit 1
+		}
+		printf "%s\n" "$MODIFIED"
+	} <<< "$JQ"
+else
+	printf "%s\n" "$NEW"
+fi
