@@ -49,7 +49,7 @@ case $HOOK in
 				{
 					read -r BLOCKS
 					read -r UUID
-					task "$UUID" modify blocks: || RES=$?
+					task "$UUID" modify blocks: >&2 || RES=$?
 					while [[ $BLOCKS = *,* ]]; do
 						block "$UUID" "${BLOCKS%%,*}" || RES=$?
 						BLOCKS=${BLOCKS#*,}
