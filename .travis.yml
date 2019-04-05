@@ -9,4 +9,4 @@ addons:
     - jq
 script:
 - make
-- bash ./test.sh
+- ./test.sh

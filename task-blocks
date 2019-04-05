@@ -1,23 +1,81 @@
 #!/bin/bash
 set -eu
 
-if [[ $(basename "$0") = on-modify.* ]]; then
+if [[ ${0##*/} = on-launch.* ]]; then
+	HOOK=on-launch
+elif [[ ${0##*/} = on-exit.* ]]; then
+	HOOK=on-exit
+	read -r NEW || NEW=
+elif [[ ${0##*/} = on-modify.* ]]; then
+	HOOK=on-modify
 	read -r OLD
-fi
-read -r NEW
-
-if [[ "$NEW" = *'"blocks"'* ]] && jq -e '.blocks' <<< "$NEW" > /dev/null; then
-	JQ=$(jq -Mcre '.blocks, .uuid, del(.blocks)' <<< "$NEW")
-	{
-		read -r BLOCKS
-		read -r UUID
-		read -r MODIFIED
-		task rc.confirmation=no rc.bulk=10000 rc.verbose=nothing "$BLOCKS" modify depends:"$UUID" >&2 || {
-			echo "Task $BLOCKS could not be blocked"
-			exit 1
-		}
-		printf "%s\n" "$MODIFIED"
-	} <<< "$JQ"
+	read -r NEW
 else
-	printf "%s\n" "$NEW"
+	HOOK=on-add
+	read -r NEW
 fi
+
+task() {
+	command task rc.confirmation=no rc.bulk=10000 rc.verbose=nothing "$@"
+}
+
+block() {
+	local UUID=$1
+	local BLOCKS=$2
+
+	if [[ $BLOCKS = -* ]]; then
+		UUID="-$UUID"
+		BLOCKS=${BLOCKS#*-}
+	fi
+
+	task "$BLOCKS" modify depends:"$UUID" >&2 || {
+		echo "Task $BLOCKS could not be blocked"
+		return 1
+	}
+}
+
+printline() {
+	printf "%s\n" "$1"
+}
+
+datafile() {
+	TASKDATA=$(task rc.hooks=off _show | grep -F 'data.location=')
+	TASKDATA=${TASKDATA#*=}
+	echo "${TASKDATA/#\~/$HOME}/blocks.data"
+}
+
+case $HOOK in
+	on-exit)
+		DATAFILE=$(datafile)
+		if [[ -e $DATAFILE ]]; then
+			{
+				rm "$DATAFILE"
+				RES=0
+				while read -r LINE; do
+					UUID=${LINE%% *}
+					BLOCKS=${LINE#* }
+					while [[ $BLOCKS = *,* ]]; do
+						block "$UUID" "${BLOCKS%%,*}" || RES=$?
+						BLOCKS=${BLOCKS#*,}
+					done
+					block "$UUID" "$BLOCKS" || RES=$?
+				done
+				exit $RES
+			} < "$DATAFILE"
+		fi
+		;;
+	on-modify|on-add)
+		if [[ "$NEW" = *\"blocks\"* ]] && JQ=$(jq -Mcre '.blocks, .uuid, del(.blocks)' <<< "$NEW"); then
+			{
+				read -r BLOCKS
+				read -r UUID
+				#read -r MODIFIED
+				echo "$UUID $BLOCKS" >> "$(datafile)"
+				#printline "$MODIFIED"
+				cat
+			} <<< "$JQ"
+		else
+			printline "$NEW"
+		fi
+		;;
+esac
