@@ -26,7 +26,7 @@ touch "$TASKRC"
 
 main() {
 	task config rc.confirmation=no uda.blocks.type string
-	task config rc.confirmation=no uda.blocks.label Blocks
+	task config rc.confirmation=no uda.blocked.type string
 
 	task_ add task1
 	task_ add task2 blocks:task1
@@ -45,6 +45,16 @@ main() {
 	task_ task2 modify blocks:-task1
 	assert '[[ $(task +BLOCKING count) -eq 0 ]]'
 	assert '[[ $(task +BLOCKED count) -eq 0 ]]'
+
+	task_ task1 modify blocked:task2,task3
+	assert '[[ $(task +BLOCKING count) -eq 2 ]]'
+	assert '[[ $(task +BLOCKED count) -eq 1 ]]'
+
+	task_ task1 modify blocked:-task3
+	assert '[[ $(task +BLOCKING count) -eq 1 ]]'
+	assert '[[ $(task +BLOCKED count) -eq 1 ]]'
+
+	assert '[[ $(task blocked.any: count) -eq 0 ]]'
 }
 
 main 2>&1 | grep -vF " override"

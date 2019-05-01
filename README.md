@@ -7,9 +7,15 @@ make install TASKDATA=$HOME/.task
 
 task config uda.blocks.type string
 task config uda.blocks.label Blocks
+
+task config uda.blocked.type string
+task config uda.blocked.label Blocked
 ```
 
 ## Usage
+
+The `blocks:` attribute is the inverse of `depends:`. `blocked:` is also
+supported as an alternative to `depends:`.
 
 ```bash
 task add sometask

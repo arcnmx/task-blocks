@@ -7,6 +7,8 @@ install:
 else
 install:
 	install -Dm0755 task-blocks "$(TASKDATA)/hooks/on-exit.task-blocks"
+	install -Dm0755 task-blocks "$(TASKDATA)/hooks/on-add.task-blocks"
+	install -Dm0755 task-blocks "$(TASKDATA)/hooks/on-modify.task-blocks"
 endif
 
 .PHONY: install

@@ -18,6 +18,12 @@ else
 	exit 1
 fi
 
+join() {
+	local IFS="$1"
+	shift
+	echo "$*"
+}
+
 task() {
 	command task rc.confirmation=no rc.bulk=10000 rc.verbose=nothing "$@"
 }
@@ -50,17 +56,73 @@ case $HOOK in
 					read -r BLOCKS
 					read -r UUID
 					task "$UUID" modify blocks: >&2 || RES=$?
-					while [[ $BLOCKS = *,* ]]; do
-						block "$UUID" "${BLOCKS%%,*}" || RES=$?
-						BLOCKS=${BLOCKS#*,}
+					IFS=, BLOCKS_ARR=($BLOCKS)
+					for BLOCK in ${BLOCKS_ARR[@]+"${BLOCKS_ARR[@]}"}; do
+						block "$UUID" "$BLOCK" || RES=$?
 					done
-					block "$UUID" "$BLOCKS" || RES=$?
 				} <<< "$JQ"
 			fi
 		done
 		exit $RES
 		;;
 	on-modify|on-add)
-		printline "$NEW"
+		if [[ "$NEW" = *\"blocked\"* ]] && JQ=$(jq -Mcre '.blocked, .depends // ""' <<< "$NEW"); then
+			{
+				read -r BLOCKED
+				read -r DEPENDS || DEPENDS=
+				FILTER=()
+
+				if [[ -n $BLOCKED ]]; then
+					IFS=, DEPENDS_ARR=($DEPENDS)
+					IFS=, BLOCKED_ARR=($BLOCKED)
+					for BLOCK in ${BLOCKED_ARR[@]+"${BLOCKED_ARR[@]}"}; do
+						NEG=false
+						if [[ $BLOCK = -* ]]; then
+							NEG=true
+							BLOCK=${BLOCK#*-}
+						fi
+
+						UUID=($(task "$BLOCK" _unique uuid))
+						if [[ ${#UUID[@]} -eq 1 ]]; then
+							if $NEG; then
+								FILTER+=("${UUID[0]}")
+							else
+								DEPENDS_ARR+=("${UUID[0]}")
+							fi
+						elif [[ ${#UUID[@]} -eq 0 ]]; then
+							echo "blocked: no task matching \"$BLOCK\""
+							exit 1
+						else
+							echo "blocked: more than one match for \"$BLOCK\": ${UUID[*]}"
+							exit 1
+						fi
+					done
+					DEPENDS_FILTERED=()
+					for UUID in ${DEPENDS_ARR[@]+"${DEPENDS_ARR[@]}"}; do
+						FILTERED=false
+						for FUUID in ${FILTER[@]+"${FILTER[@]}"}; do
+							if [[ $UUID = $FUUID ]]; then
+								FILTERED=true
+							fi
+						done
+
+						if ! $FILTERED; then
+							DEPENDS_FILTERED+=("$UUID")
+						fi
+					done
+					DEPENDS=$(join , ${DEPENDS_FILTERED[@]+"${DEPENDS_FILTERED[@]}"})
+				fi
+
+				if [[ -n $DEPENDS ]]; then
+					QUERY="del(.blocked) + {\"depends\": \"$DEPENDS\"}"
+				else
+					QUERY="del(.blocked, .depends)"
+				fi
+				jq -Mce "$QUERY" >&2 <<< "$NEW"
+				jq -Mce "$QUERY" <<< "$NEW"
+			} <<< "$JQ"
+		else
+			printline "$NEW"
+		fi
 		;;
 esac
