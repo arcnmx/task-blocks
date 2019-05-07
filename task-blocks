@@ -118,7 +118,6 @@ case $HOOK in
 				else
 					QUERY="del(.blocked, .depends)"
 				fi
-				jq -Mce "$QUERY" >&2 <<< "$NEW"
 				jq -Mce "$QUERY" <<< "$NEW"
 			} <<< "$JQ"
 		else
