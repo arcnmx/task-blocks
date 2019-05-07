@@ -1,5 +1,9 @@
 os:
 - linux
+env:
+  matrix:
+  - TASK_BLOCKS_TEST_ARRAY=0
+  - TASK_BLOCKS_TEST_ARRAY=1
 sudo: false
 dist: xenial
 addons:

@@ -27,6 +27,11 @@ touch "$TASKRC"
 main() {
 	task config rc.confirmation=no uda.blocks.type string
 	task config rc.confirmation=no uda.blocked.type string
+	if [[ ${TASK_BLOCKS_TEST_ARRAY-} = 1 ]]; then
+		task config rc.confirmation=no json.depends.array on
+	else
+		task config rc.confirmation=no json.depends.array off
+	fi
 
 	task_ add task1
 	task_ add task2 blocks:task1

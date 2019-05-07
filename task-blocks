@@ -72,6 +72,11 @@ case $HOOK in
 				read -r DEPENDS || DEPENDS=
 				FILTER=()
 
+				if [[ $DEPENDS = [* ]]; then
+					DEPENDS_ARR=($(jq -Mcre '.[]' <<< "$DEPENDS"))
+					DEPENDS=$(join , ${DEPENDS_ARR[@]+"${DEPENDS_ARR[@]}"})
+				fi
+
 				if [[ -n $BLOCKED ]]; then
 					IFS=, DEPENDS_ARR=($DEPENDS)
 					IFS=, BLOCKED_ARR=($BLOCKED)
